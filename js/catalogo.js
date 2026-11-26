@@ -1,0 +1,655 @@
+/* Fatto a Mano: catalogo folheavel de UNIFORMES CORPORATIVOS FEMININOS.
+   Monta as 9 paginas a partir de js/produtos.js (capa, 6 pecas, personalizacao e contato) e uma pagina por folha.
+   Computador: pagina deitada como no PDF, vira em 3D pela borda esquerda.
+   Celular (o script marca <html class="cel">): pagina em pe que rola por dentro; as paginas ficam lado a lado e
+   deslizam acompanhando o dedo, sem 3D. Tocar ou clicar numa foto abre ela ampliada (visor). */
+(function () {
+  'use strict';
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const reduzido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const temMouse = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const LOJA = window.LOJA, ATRIBUTOS = window.ATRIBUTOS, PRODUTOS = window.PRODUTOS;
+  const CAPA = window.CAPA, CONSULTA = window.CONSULTA, PERSONALIZACAO = window.PERSONALIZACAO, FINAL = window.FINAL;
+  const RAZAO = 4800 / 3150; // proporcao da pagina do PDF
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const n2 = (i) => String(i).padStart(2, '0');
+  const foto = (tam, nome) => 'fotos/' + tam + '/' + nome + '.webp';
+  const zapLink = (texto) => 'https://wa.me/' + LOJA.whatsapp + '?text=' + encodeURIComponent(texto);
+  const reais = (v) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // imagem carregada so quando a pagina chega perto (data-src vira src em carregar())
+  const img = (nome, alt, larguras, sizes) =>
+    '<img data-src="' + foto('grande', nome) + '"' +
+    ' data-srcset="' + foto('media', nome) + ' ' + larguras[0] + 'w, ' + foto('grande', nome) + ' ' + larguras[1] + 'w"' +
+    ' data-sizes="' + sizes + '" alt="' + esc(alt) + '" decoding="async" draggable="false">';
+  // atributos de uma foto que abre ampliada: data-zoom = arquivo maior; data-previa = o que ja esta carregado, mostrado enquanto o maior chega
+  const zoom = (grande, previa, alt) => ' data-zoom="' + grande + '"' + (previa ? ' data-previa="' + previa + '"' : '') + ' data-alt="' + esc(alt) + '"';
+  const DICA = temMouse ? 'Passe o mouse para ampliar' : 'Toque para ampliar';
+
+  const SVG = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const ICONES = {
+    algodao: SVG('<path d="M7.2 11.2a2.6 2.6 0 0 1 4.8-2 2.6 2.6 0 0 1 4.8 2 2.7 2.7 0 0 1-1.4 5H8.6a2.7 2.7 0 0 1-1.4-5z"/><path d="M12 16.2V21"/><path d="M12 18.4l2.6-1.5M12 19.9l-2.6-1.5"/>'),
+    diamante: SVG('<path d="M7 4h10l4 5.2L12 20 3 9.2z"/><path d="M3 9.2h18M9 4l3 5.2L15 4M12 9.2V20"/>'),
+    camiseta: SVG('<path d="M8.2 4.2 12 5.6l3.8-1.4 4.6 2.8-1.9 3.6-2.1-1V20H7.6V9.6l-2.1 1-1.9-3.6z"/>'),
+    tecido: SVG('<path d="M5 5h14v14H5z"/><path d="M9.7 5v14M14.3 5v14M5 9.7h14M5 14.3h14"/>'),
+    camisa: SVG('<path d="M9 4h6l1 2 4.5 1.6-1.4 4.2-2.1-.6V20H7V11.2l-2.1.6L3.5 7.6 8 6z"/><path d="M9 4c0 2 1.3 3.2 3 3.2S15 6 15 4"/>'),
+    camadas: SVG('<path d="M12 4l9 5-9 5-9-5z"/><path d="M3 13.5l9 5 9-5"/>'),
+    broto: SVG('<path d="M12 21v-9"/><path d="M12 12c0-3.6-2.6-5.8-6.4-5.8 0 3.6 2.6 5.8 6.4 5.8z"/><path d="M12 12c0-3.6 2.6-5.8 6.4-5.8 0 3.6-2.6 5.8-6.4 5.8z"/><path d="M8.5 21h7"/>'),
+    peca: SVG('<path d="M9 3.5h6l4.5 3.2-1.8 3.4-1.7-.8V20.5H8V9.3l-1.7.8-1.8-3.4z"/><path d="M9 3.5c.4 1.6 1.5 2.6 3 2.6s2.6-1 3-2.6"/><path d="M12 6.1V20.5"/>'),
+    zap: SVG('<path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.2-1.4-1.9-1-1 .8a4 4 0 0 1-2.2-2.2l.8-1-1-1.9L9 9.5z"/>'),
+    email: SVG('<rect x="2.5" y="5.5" width="19" height="13" rx="1.2"/><path d="M3 6.5l9 7 9-7"/>'),
+    fechar: SVG('<path d="M6 6l12 12M18 6L6 18"/>'),
+  };
+
+  /* ---------- paginas ---------- */
+  const paginas = [];
+  function pagina(o) { o.indice = paginas.length; paginas.push(o); return o; }
+
+  // 1. capa: foto do conjunto off-white e painel creme
+  pagina({
+    classe: 'pg-capa', rotulo: 'Capa',
+    html: () =>
+      '<figure class="capa-foto"' + zoom('fotos/zoom/' + CAPA.foto + '.webp', foto('grande', CAPA.foto), CAPA.alt) + '>' +
+        img(CAPA.foto, CAPA.alt, [656, 919], '(max-width: 899px) 100vw, 46vw') + '</figure>' +
+      '<div class="capa-painel">' +
+        '<p class="capa-rotulo">' + esc(CAPA.rotulo) + '</p>' +
+        '<img class="capa-logo" src="fotos/marca/lockup-escuro.png" alt="' + esc(LOJA.nome + ', ' + LOJA.assinatura) + '">' +
+        '<span class="capa-fio" aria-hidden="true"></span>' +
+        '<h1 class="capa-titulo">' + CAPA.titulo.map((t, k) => '<span style="--i:' + k + '">' + esc(t) + '</span>').join('') + '<em>' + esc(CAPA.ano) + '</em></h1>' +
+        '<p class="capa-texto">' + esc(CAPA.texto) + '</p>' +
+        '<ol class="capa-indice">' + PRODUTOS.map((p, k) => '<li style="--i:' + k + '"><button type="button" data-ir="' + (k + 1) + '"><span>' + n2(k + 1) + '</span>' + esc(p.nome) + '</button></li>').join('') + '</ol>' +
+        '<p class="capa-rodape">' + esc(CAPA.rodape) + '</p>' +
+      '</div>',
+  });
+
+  // 2 a 7. pecas
+  PRODUTOS.forEach(p => {
+    p.pagina = pagina({ classe: 'pg-peca', produto: p.id, rotulo: p.nome, html: () => fichaHtml(p) }).indice;
+  });
+
+  function fichaHtml(p) {
+    const linhas = p.linhas || [p.nome];
+    const d1 = foto('grande', p.id + '-detalhe-1'), d2 = foto('grande', p.id + '-detalhe-2');
+    return '<figure class="peca-modelo"' + zoom('fotos/zoom/' + p.id + '-modelo.webp', foto('grande', p.id + '-modelo'), p.fotos.modelo) + '>' +
+        img(p.id + '-modelo', p.fotos.modelo, [656, 919], '(max-width: 899px) 100vw, 46vw') + '</figure>' +
+      '<div class="peca-detalhes">' +
+        '<figure' + zoom(d1, '', p.fotos.detalhe1) + '>' + img(p.id + '-detalhe-1', p.fotos.detalhe1, [320, 408], '(max-width: 899px) 50vw, 19vw') + '</figure>' +
+        '<figure' + zoom(d2, '', p.fotos.detalhe2) + '>' + img(p.id + '-detalhe-2', p.fotos.detalhe2, [320, 408], '(max-width: 899px) 50vw, 19vw') +
+          '<span class="peca-dica" aria-hidden="true">' + DICA + '</span></figure>' +
+      '</div>' +
+      '<div class="peca-ficha">' +
+        '<p class="ficha-rotulo">Uniformes corporativos</p>' +
+        '<h2 class="ficha-titulo" aria-label="' + esc(p.nome) + '"><span>' + linhas.map(esc).join(' <br>') + '</span></h2>' +
+        '<span class="ficha-traco" aria-hidden="true"></span>' +
+        '<p class="ficha-descricao">' + esc(p.descricao) + '</p>' +
+        '<ul class="ficha-atributos">' +
+          ATRIBUTOS.map((a, k) => '<li style="--i:' + k + '">' + ICONES[a.icone] + '<span>' + esc(a.texto) + '</span></li>').join('') +
+        '</ul>' +
+        '<p class="ficha-rotulo ficha-cores-rotulo">Cores disponíveis</p>' +
+        '<div class="ficha-cores' + (p.cores.length > 5 ? ' muitas' : '') + '" role="group" aria-label="Cores">' +
+          p.cores.map((c, k) => '<button type="button" class="cor" data-cor="' + c.id + '" style="--hex:' + c.hex + ';--i:' + k + '" aria-pressed="' + (k === 0) + '"><i aria-hidden="true"></i>' + esc(c.nome) + '</button>').join('') +
+        '</div>' +
+        '<p class="ficha-atacado"><span>' + esc(CONSULTA.selo) + '</span></p>' +
+        '<p class="ficha-consulta">' + esc(CONSULTA.titulo) + '</p>' +
+        '<p class="ficha-consulta-texto">' + esc(CONSULTA.texto) + '</p>' +
+        '<a class="ficha-zap" target="_blank" rel="noopener">' + ICONES.zap + '<span>Pedir orçamento pelo WhatsApp</span></a>' +
+        '<img class="ficha-logo" src="fotos/marca/lockup-escuro.png" alt="" aria-hidden="true">' +
+      '</div>';
+  }
+
+  // 8. personalizacao (igual ao PDF)
+  pagina({
+    classe: 'pg-perso', rotulo: 'Personalização',
+    html: () =>
+      '<p class="perso-rotulo">' + esc(PERSONALIZACAO.rotulo) + '</p>' +
+      '<img class="perso-logo" src="fotos/marca/lockup-escuro.png" alt="' + esc(LOJA.nome + ', ' + LOJA.assinatura) + '">' +
+      '<h2 class="perso-titulo">' + esc(PERSONALIZACAO.titulo) + '</h2>' +
+      '<ul class="perso-grade">' + PERSONALIZACAO.tecnicas.map((t, k) =>
+        '<li style="--i:' + k + '"><span class="perso-n">' + n2(k + 1) + '</span><h3>' + esc(t.titulo) + '</h3><p>' + esc(t.texto) + '</p></li>').join('') + '</ul>' +
+      '<a class="perso-zap" href="' + esc(zapLink(LOJA.mensagemGeral)) + '" target="_blank" rel="noopener">' + ICONES.zap + '<span>Falar sobre personalização</span></a>',
+  });
+
+  // 9. contato
+  pagina({
+    classe: 'pg-final', rotulo: 'Contato',
+    html: () =>
+      '<div class="final-luz" aria-hidden="true"></div>' +
+      '<img class="final-logo" src="fotos/marca/lockup-escuro.png" alt="' + esc(LOJA.nome + ', ' + LOJA.assinatura) + '">' +
+      '<h2 class="final-titulo">' + esc(FINAL.titulo) + '</h2>' +
+      '<p class="final-texto">' + esc(FINAL.texto) + '</p>' +
+      '<div class="final-contatos">' +
+        '<a class="contato" style="--i:0" href="' + esc(zapLink(LOJA.mensagemGeral)) + '" target="_blank" rel="noopener">' +
+          // o mais e o hifen da Bodoni sao fios quase invisiveis: saem na letra de texto
+          ICONES.zap + '<span class="contato-rotulo">WhatsApp</span><span class="contato-valor">' + esc(LOJA.whatsappTexto).replace(/[+-]/g, s => '<i>' + s + '</i>') + '</span></a>' +
+        '<span class="contato-divisor" aria-hidden="true"></span>' +
+        '<a class="contato" style="--i:1" href="mailto:' + esc(LOJA.email) + '">' +
+          ICONES.email + '<span class="contato-rotulo">E-mail</span><span class="contato-valor miudo">' + esc(LOJA.email) + '</span></a>' +
+      '</div>' +
+      '<span class="final-traco" aria-hidden="true"></span>' +
+      '<p class="final-marca">' + esc(LOJA.nome) + '<sup>&reg;</sup></p>' +
+      '<div class="final-faixa" aria-hidden="true"></div>',
+  });
+
+  /* ---------- livro ---------- */
+  const livro = $('.livro');
+  const mesa = $('.mesa');
+  const N = paginas.length;
+  let atual = 0, folhas = [], celular = null;
+
+  function dimensionar() {
+    const cel = innerWidth < 900 || innerHeight > innerWidth * 1.05;
+    document.documentElement.classList.toggle('cel', cel);
+    const topo = 48, base = cel ? 72 : 76;
+    document.documentElement.style.setProperty('--topo', topo + 'px');
+    document.documentElement.style.setProperty('--base', base + 'px');
+    const altura = innerHeight - topo - base;
+    let pw, ph;
+    if (cel) { pw = innerWidth; ph = altura; }
+    else {
+      const m = 18;
+      ph = altura - 2 * m;
+      pw = Math.round(ph * RAZAO);
+      if (pw > innerWidth - 2 * m) { pw = innerWidth - 2 * m; ph = Math.round(pw / RAZAO); }
+    }
+    document.documentElement.style.setProperty('--pw', pw + 'px');
+    document.documentElement.style.setProperty('--ph', ph + 'px');
+    return cel;
+  }
+
+  function construir() {
+    const cel = dimensionar();
+    arr = null;
+    livro.classList.remove('arrastando');
+    if (cel === celular && folhas.length) { ir(atual, true); return; }
+    celular = cel;
+    livro.innerHTML = '<div class="livro-sombra" aria-hidden="true"></div>';
+    folhas = paginas.map(pg => {
+      const f = document.createElement('div');
+      f.className = 'folha';
+      f.innerHTML =
+        '<div class="lado frente" data-pagina="' + pg.indice + '"><div class="pg ' + pg.classe + '"' + (pg.produto ? ' data-produto="' + pg.produto + '"' : '') + '>' + pg.html() + '</div>' +
+          // no celular, aviso fixo de que a pagina da peca continua para baixo (fica fora da area que rola)
+          (pg.produto ? '<span class="pista-rolar" aria-hidden="true">Cores e orçamento</span>' : '') +
+        '</div>' +
+        '<div class="lado verso" aria-hidden="true"></div>';
+      livro.appendChild(f);
+      return f;
+    });
+    ligar();
+    ir(atual, true);
+  }
+
+  function ir(s, imediato) {
+    s = Math.max(0, Math.min(N - 1, s));
+    if (celular) return irCelular(s, imediato);
+    const anterior = atual;
+    atual = s;
+    const parado = imediato || reduzido;
+    folhas.forEach((f, j) => {
+      const virada = j < s;
+      const mudou = f.classList.contains('virada') !== virada;
+      if (parado) {
+        f.style.transition = 'none';
+        f.style.transitionDelay = '';
+        f.classList.toggle('oculta', virada);
+        f.style.zIndex = virada ? (j + 1) : (2 * N - j);
+      } else if (mudou) {
+        f.style.transition = '';
+        f.style.transitionDelay = (0.08 * (virada ? (j - anterior) : (anterior - 1 - j))) + 's';
+        f.classList.remove('oculta');
+        f.classList.add('virando');
+        f.style.zIndex = 3 * N + (virada ? j : (N - j));
+        f.addEventListener('transitionend', fimDaVirada, { once: true });
+      }
+      f.classList.toggle('virada', virada);
+      if (parado) { void f.offsetWidth; f.style.transition = ''; }
+    });
+    atualizarCromo();
+  }
+  function fimDaVirada(e) {
+    const f = e.currentTarget;
+    const j = folhas.indexOf(f);
+    const virada = f.classList.contains('virada');
+    f.classList.remove('virando');
+    f.classList.toggle('oculta', virada);
+    f.style.transitionDelay = '';
+    f.style.zIndex = virada ? (j + 1) : (2 * N - j);
+  }
+
+  // celular: a folha vira em 3D pela borda esquerda, mas so enquanto vira (classe .girando).
+  // Parada, so a pagina atual fica visivel e sem transform, que e o que deixa o dedo rolar por dentro dela.
+  // Em cada folha: data-v (1 = ja virada), --ang (angulo) e --t (quanto escurece).
+  const ANG_VIRADA = -104;
+  let assenta = null;
+  function estadoFolha(f, virada, animar) {
+    if (!animar) f.style.transition = 'none';
+    f.dataset.v = virada ? '1' : '0';
+    f.style.setProperty('--ang', virada ? ANG_VIRADA + 'deg' : '0deg');
+    f.style.setProperty('--t', virada ? '1' : '0');
+    if (!animar) { void f.offsetWidth; f.style.transition = ''; }
+  }
+  function assentar() {
+    clearTimeout(assenta);
+    folhas.forEach((f, j) => {
+      // tira o 3D de uma vez, sem transicao: a pagina parada tem de ficar sem transform ja
+      const girava = f.classList.contains('girando');
+      if (girava) f.style.transition = 'none';
+      f.classList.remove('girando');
+      f.style.zIndex = j < atual ? 0 : N - j;
+      f.classList.toggle('oculta', j !== atual);
+      if (girava) { void f.offsetWidth; f.style.transition = ''; }
+    });
+  }
+  function irCelular(s, imediato) {
+    const anterior = atual;
+    atual = s;
+    const parado = imediato || reduzido;
+    clearTimeout(assenta);
+    // so uma folha vira a vista: a que sai (indo para a frente) ou a que volta (indo para tras)
+    const principal = s > anterior ? anterior : s < anterior ? s : -1;
+    folhas.forEach((f, j) => {
+      f.classList.remove('virada', 'virando');
+      f.style.transitionDelay = '';
+      const anima = !parado && (j === principal || f.classList.contains('girando'));
+      if (anima) { f.classList.add('girando'); f.classList.remove('oculta'); f.style.zIndex = 3 * N - j; }
+      else if (j === s) f.classList.remove('oculta');
+      estadoFolha(f, j < s, anima);
+    });
+    if (parado) assentar(); else assenta = setTimeout(assentar, 660);
+    atualizarCromo();
+  }
+
+  function atualizarCromo() {
+    $('.topo-contador').textContent = (atual === 0 ? 'Capa' : 'p. ' + n2(atual + 1)) + '  /  ' + n2(N);
+    $$('.mini').forEach(m => m.classList.toggle('ativa', +m.dataset.pagina === atual));
+    const ativa = $('.mini.ativa');
+    if (ativa) ativa.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduzido ? 'auto' : 'smooth' });
+    $('.seta-ant').disabled = atual === 0;
+    $('.seta-prox').disabled = atual === N - 1;
+    $$('.lado.frente').forEach(l => {
+      const v = +l.dataset.pagina === atual;
+      l.toggleAttribute('inert', !v);
+      l.setAttribute('aria-hidden', String(!v));
+      const era = l.classList.contains('ativa');
+      l.classList.toggle('ativa', v);
+      if (Math.abs(+l.dataset.pagina - atual) <= 1) carregar(l);
+      if (v && !era) entrar(l);
+    });
+  }
+
+  function carregar(l) {
+    $$('img[data-src]', l).forEach(i => {
+      i.srcset = i.dataset.srcset; i.sizes = i.dataset.sizes; i.src = i.dataset.src;
+      i.removeAttribute('data-src'); i.removeAttribute('data-srcset'); i.removeAttribute('data-sizes');
+    });
+  }
+
+  function montarMiniaturas() {
+    const c = $('.miniaturas');
+    paginas.forEach(p => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mini';
+      b.dataset.pagina = p.indice;
+      b.setAttribute('aria-label', 'Ir para ' + p.rotulo);
+      b.style.backgroundImage = 'url(fotos/mini/u-p' + n2(p.indice + 1) + '.webp)';
+      b.addEventListener('click', () => ir(p.indice));
+      c.appendChild(b);
+    });
+  }
+
+  /* ---------- efeitos que precisam de script ---------- */
+  // ao entrar numa pagina: volta ao alto; a ficha da peca so se anima quando esta a vista
+  function entrar(l) {
+    const pg = $('.pg', l);
+    if (pg) pg.scrollTop = 0;
+    l.classList.remove('rolou');
+    const ficha = $('.peca-ficha', l);
+    if (ficha) { ficha.classList.remove('vista'); verFicha(l); }
+  }
+  // marca a ficha como vista quando ela entra na tela (no computador, de imediato; no celular, quando a pessoa rola ate ela)
+  function verFicha(l) {
+    const ficha = $('.peca-ficha', l), pg = $('.pg', l);
+    if (!ficha || ficha.classList.contains('vista') || !l.classList.contains('ativa')) return;
+    const r = ficha.getBoundingClientRect(), p = pg.getBoundingClientRect();
+    if (r.top > p.bottom - Math.min(90, p.height * 0.15)) return;
+    ficha.classList.add('vista');
+    contarPreco(l);
+  }
+  // o preco conta de zero ate o valor, junto com a entrada dele no CSS
+  function contarPreco(l) {
+    const preco = $('.ficha-preco b[data-valor]', l);
+    if (!preco) return;
+    const alvo = Number(preco.dataset.valor);
+    if (reduzido) { preco.textContent = reais(alvo); return; }
+    preco.textContent = reais(0);
+    const inicio = performance.now() + (celular ? 1200 : 1900), dur = 1300;
+    (function passo(t) {
+      if (!l.classList.contains('ativa')) { preco.textContent = reais(alvo); return; }
+      if (t < inicio) { requestAnimationFrame(passo); return; }
+      const k = Math.min(1, (t - inicio) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      preco.textContent = reais(alvo * e);
+      if (k < 1) requestAnimationFrame(passo); else preco.textContent = reais(alvo);
+    })(performance.now());
+  }
+
+  // lupa (amplia o tecido) e inclinacao 3D nas fotos de detalhe: so com mouse. No toque, tocar abre a foto ampliada.
+  function detalhes(pg) {
+    $$('.peca-detalhes figure', pg).forEach(fig => {
+      const im = $('img', fig);
+      const dica = $('.peca-dica', pg);
+      const lente = document.createElement('div');
+      lente.className = 'lupa';
+      lente.setAttribute('aria-hidden', 'true');
+      pg.appendChild(lente);
+      const ZOOM = 2.3;
+      let aberta = false;
+      function mover(e) {
+        const r = fig.getBoundingClientRect(), pr = pg.getBoundingClientRect();
+        const x = e.clientX - r.left, y = e.clientY - r.top;
+        if (x < 0 || y < 0 || x > r.width || y > r.height) { fechar(); return; }
+        if (!aberta) { aberta = true; lente.style.backgroundImage = 'url(' + fig.dataset.zoom + ')'; lente.classList.add('aberta'); if (dica) dica.classList.add('some'); }
+        const d = lente.offsetWidth;
+        lente.style.left = (e.clientX - pr.left - d / 2) + 'px';
+        lente.style.top = (e.clientY - pr.top + pg.scrollTop - d / 2) + 'px';
+        // a foto esta em object-fit: cover; descobre o tamanho e o deslocamento com que ela esta desenhada
+        const nat = (im.naturalWidth || 920) / (im.naturalHeight || 1500), fr = r.width / r.height;
+        let iw, ih, ox, oy;
+        if (nat > fr) { ih = r.height; iw = ih * nat; ox = (r.width - iw) / 2; oy = 0; } else { iw = r.width; ih = iw / nat; ox = 0; oy = (r.height - ih) / 2; }
+        lente.style.backgroundSize = (iw * ZOOM) + 'px ' + (ih * ZOOM) + 'px';
+        lente.style.backgroundPosition = (-((x - ox) * ZOOM - d / 2)) + 'px ' + (-((y - oy) * ZOOM - d / 2)) + 'px';
+        if (!reduzido) {
+          const px = x / r.width - 0.5, py = y / r.height - 0.5;
+          fig.style.setProperty('--ry', (px * 9).toFixed(2) + 'deg');
+          fig.style.setProperty('--rx', (-py * 9).toFixed(2) + 'deg');
+          fig.style.setProperty('--sx', (x / r.width * 100).toFixed(1) + '%');
+          fig.style.setProperty('--sy', (y / r.height * 100).toFixed(1) + '%');
+          fig.classList.add('inclina');
+        }
+      }
+      function fechar() {
+        aberta = false;
+        lente.classList.remove('aberta');
+        fig.classList.remove('inclina');
+        fig.style.removeProperty('--rx'); fig.style.removeProperty('--ry');
+      }
+      fig.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !celular) mover(e); });
+      fig.addEventListener('pointerleave', fechar);
+    });
+  }
+
+  // paralaxe com o mouse no Look Book e na pagina dos seis modelos (--mx e --my entre -1 e 1)
+  function paralaxe() {
+    if (!temMouse || reduzido) return;
+    let alvo = null;
+    mesa.addEventListener('pointermove', e => {
+      if (celular || e.pointerType !== 'mouse') return;
+      const pg = livro.querySelector('.lado.frente.ativa .pg-capa');
+      if (!pg) return;
+      const r = pg.getBoundingClientRect();
+      const mx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - 0.5) * 2));
+      const my = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - 0.5) * 2));
+      pg.style.setProperty('--mx', mx.toFixed(3)); pg.style.setProperty('--my', my.toFixed(3));
+      alvo = pg;
+    });
+    mesa.addEventListener('pointerleave', () => { if (alvo) { alvo.style.setProperty('--mx', '0'); alvo.style.setProperty('--my', '0'); } });
+  }
+
+  /* ---------- foto ampliada (visor) ---------- */
+  const visor = document.createElement('div');
+  visor.className = 'visor';
+  visor.hidden = true;
+  visor.setAttribute('role', 'dialog');
+  visor.setAttribute('aria-modal', 'true');
+  visor.setAttribute('aria-label', 'Foto ampliada');
+  visor.innerHTML = '<div class="visor-rolo"><img alt="" draggable="false"></div>' +
+    '<button class="visor-fechar" type="button" aria-label="Fechar a foto ampliada">' + ICONES.fechar + '</button>' +
+    '<p class="visor-dica" aria-hidden="true"></p>';
+  document.body.appendChild(visor);
+  const vRolo = $('.visor-rolo', visor), vImg = $('img', visor), vFechar = $('.visor-fechar', visor), vDica = $('.visor-dica', visor);
+  let vVolta = null, vTimer = null, vVez = 0;
+
+  function abrirVisor(alvo) {
+    clearTimeout(vTimer);
+    const vez = ++vVez;
+    const grande = alvo.dataset.zoom, previa = alvo.dataset.previa;
+    vVolta = document.activeElement;
+    visor.classList.remove('zoom');
+    vImg.style.removeProperty('--zw');
+    vImg.alt = alvo.dataset.alt || '';
+    vDica.textContent = temMouse ? 'Clique na foto para aproximar' : 'Toque na foto para aproximar';
+    if (previa) {
+      // mostra ja o que esta carregado e troca pela foto maior quando ela chegar
+      vImg.src = previa;
+      const maior = new Image();
+      maior.onload = () => { if (vez === vVez && !visor.hidden) vImg.src = grande; };
+      maior.src = grande;
+    } else vImg.src = grande;
+    visor.hidden = false;
+    void visor.offsetWidth;
+    visor.classList.add('aberto');
+    try { history.pushState({ visor: 1 }, ''); } catch (e) {}
+    vFechar.focus({ preventScroll: true });
+  }
+  function fecharVisor(peloVoltar) {
+    if (visor.hidden || !visor.classList.contains('aberto')) return;
+    vVez++;
+    visor.classList.remove('aberto');
+    vTimer = setTimeout(() => { visor.hidden = true; visor.classList.remove('zoom'); vImg.removeAttribute('src'); }, reduzido ? 0 : 260);
+    if (!peloVoltar) { try { if (history.state && history.state.visor) history.back(); } catch (e) {} }
+    if (vVolta && vVolta.focus) { try { vVolta.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  // tocar na foto aproxima no ponto tocado; tocar de novo volta a foto inteira
+  function alternarZoom(e) {
+    if (!visor.classList.contains('zoom')) {
+      const r = vImg.getBoundingClientRect(), c = vRolo.getBoundingClientRect();
+      if (!r.width) return;
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      // aproxima ate onde a foto ainda fica nitida nesta tela, entre 1,6 e 2,6 vezes
+      const nitido = (vImg.naturalWidth || r.width * 2) / (r.width * Math.min(devicePixelRatio || 1, 3) * 0.62);
+      const Z = Math.max(1.6, Math.min(2.6, nitido));
+      vImg.style.setProperty('--zw', Math.round(r.width * Z) + 'px');
+      visor.classList.add('zoom');
+      const n = vImg.getBoundingClientRect();
+      vRolo.scrollLeft = fx * n.width - (e.clientX - c.left);
+      vRolo.scrollTop = fy * n.height - (e.clientY - c.top);
+    } else {
+      visor.classList.remove('zoom');
+      vRolo.scrollLeft = 0; vRolo.scrollTop = 0;
+    }
+  }
+  vImg.addEventListener('click', e => { e.stopPropagation(); alternarZoom(e); });
+  vRolo.addEventListener('click', e => { if (e.target === vRolo && !visor.classList.contains('zoom')) fecharVisor(); });
+  vFechar.addEventListener('click', () => fecharVisor());
+  addEventListener('popstate', () => fecharVisor(true));
+
+  /* ---------- liga o que esta dentro das paginas ---------- */
+  function ligar() {
+    PRODUTOS.forEach(p => {
+      const pg = livro.querySelector('.pg-peca[data-produto="' + p.id + '"]');
+      if (!pg) return;
+      const lado = pg.closest('.lado');
+      const zap = $('.ficha-zap', pg);
+      const botoes = $$('.cor', pg);
+      function escolher(id) {
+        const c = p.cores.find(x => x.id === id) || p.cores[0];
+        botoes.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cor === c.id)));
+        zap.href = zapLink(LOJA.mensagem.replace('{peca}', p.nome).replace('{cor}', c.nome));
+        zap.setAttribute('aria-label', 'Pedir orçamento de ' + p.nome + ' na cor ' + c.nome + ' pelo WhatsApp');
+        $('span', zap).textContent = 'Pedir orçamento · ' + c.nome;
+      }
+      botoes.forEach(b => b.addEventListener('click', () => escolher(b.dataset.cor)));
+      escolher(p.cores[0].id);
+      detalhes(pg);
+      pg.addEventListener('scroll', () => { lado.classList.toggle('rolou', pg.scrollTop > 24); verFicha(lado); }, { passive: true });
+    });
+  }
+
+  /* ---------- navegacao ---------- */
+  livro.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-ir]'); if (b) { e.stopPropagation(); ir(+b.dataset.ir); } }, true);
+  $('.seta-prox').addEventListener('click', () => ir(atual + 1));
+  $('.seta-ant').addEventListener('click', () => ir(atual - 1));
+  document.addEventListener('keydown', function (e) {
+    if (!visor.hidden) { if (e.key === 'Escape') fecharVisor(); return; }
+    if (e.target.closest && e.target.closest('input, textarea')) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') ir(atual + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') ir(atual - 1);
+    else if (e.key === 'Home') ir(0);
+    else if (e.key === 'End') ir(N - 1);
+  });
+
+  // ---- arrastar para o lado ----
+  // Celular: a folha gira acompanhando o dedo e, ao soltar, termina de virar ou volta, conforme a distancia e a velocidade.
+  // Computador: arrastar mais de 50 px vira a folha.
+  // O dedo e lido por eventos de toque, com preventDefault quando o gesto e de lado: assim o navegador do celular
+  // nao toma o gesto para si (no iPhone e no Android de verdade ele cancelava o arrasto). Mouse e caneta vem por
+  // pointer events. A rolagem para cima e para baixo continua sendo do navegador.
+  let arr = null, ultimoArrasto = 0;
+
+  function repousar(j) {
+    const f = folhas[j], virada = j < atual;
+    f.classList.remove('girando');
+    f.style.setProperty('--ang', virada ? ANG_VIRADA + 'deg' : '0deg');
+    f.style.setProperty('--t', virada ? '1' : '0');
+    f.style.zIndex = virada ? 0 : N - j;
+    f.classList.toggle('oculta', j !== atual);
+  }
+  // d = quanto o dedo andou para o lado desde que o gesto foi reconhecido
+  function girarCom(d) {
+    const a = arr;
+    let j = -1, ang = 0;
+    if (d < 0) {
+      // para a frente: a pagina atual levanta; a borda solta acompanha o dedo
+      j = atual;
+      let p = Math.min(1, -d / a.w);
+      if (atual === N - 1) p *= 0.1; // ultima pagina: a folha so levanta um pouco
+      ang = -Math.acos(1 - p) * 180 / Math.PI;
+    } else if (d > 0 && atual > 0) {
+      // para tras: a pagina anterior volta por cima
+      j = atual - 1;
+      ang = -Math.acos(Math.min(1, d / a.w)) * 180 / Math.PI;
+    }
+    if (j !== a.alvo) {
+      if (a.alvo >= 0) repousar(a.alvo);
+      a.alvo = j;
+      if (j >= 0) {
+        folhas[j].classList.add('girando');
+        folhas[j].classList.remove('oculta');
+        folhas[j].style.zIndex = 3 * N - j;
+        if (j === atual && folhas[j + 1]) folhas[j + 1].classList.remove('oculta');
+      }
+    }
+    a.dx = d;
+    if (j < 0) return;
+    folhas[j].style.setProperty('--ang', ang.toFixed(2) + 'deg');
+    folhas[j].style.setProperty('--t', Math.min(1, -ang / 90).toFixed(3));
+  }
+
+  function inicio(x, y, alvo, id) {
+    if (alvo && alvo.closest && alvo.closest('button, a')) { arr = null; return; }
+    arr = { id: id, x0: x, y0: y, dx: 0, bruto: 0, eixo: null, alvo: -1, base: 0, w: 0, am: [] };
+  }
+  // devolve true quando o gesto e de lado (quem chama segura o gesto para o navegador nao usar)
+  function movimento(x, y) {
+    if (!arr) return false;
+    const dx = x - arr.x0, dy = y - arr.y0;
+    if (!arr.eixo) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return false;
+      arr.eixo = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (arr.eixo === 'x' && celular) {
+        assentar();
+        livro.classList.add('arrastando');
+        arr.base = dx;
+        arr.w = livro.getBoundingClientRect().width || innerWidth;
+      }
+    }
+    if (arr.eixo !== 'x') return false;
+    // guarda os ultimos 120 ms do gesto, para medir a velocidade na hora de soltar
+    const agora = performance.now();
+    arr.bruto = dx;
+    arr.am.push([agora, dx]);
+    while (arr.am.length > 2 && agora - arr.am[0][0] > 120) arr.am.shift();
+    if (celular) girarCom(dx - arr.base);
+    return true;
+  }
+  function fim(x, y, cancelado) {
+    const a = arr; arr = null;
+    if (!a) return;
+    if (!celular) {
+      const dx = x - a.x0, dy = y - a.y0;
+      if (!cancelado && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { ultimoArrasto = performance.now(); ir(atual + (dx < 0 ? 1 : -1)); }
+      return;
+    }
+    if (a.eixo !== 'x') return;
+    ultimoArrasto = performance.now();
+    livro.classList.remove('arrastando');
+    void livro.offsetWidth; // a folha termina de virar a partir do angulo em que o dedo deixou
+    let dir = 0;
+    if (!cancelado) {
+      // velocidade do fim do gesto, em px por ms (zero se o dedo parou antes de soltar)
+      const am = a.am, n = am.length, agora = performance.now();
+      const veloc = (n >= 2 && agora - am[n - 1][0] < 120) ? (am[n - 1][1] - am[0][1]) / Math.max(1, am[n - 1][0] - am[0][0]) : 0;
+      if (Math.abs(veloc) > 0.25 && Math.abs(a.bruto) > 14) dir = veloc < 0 ? 1 : -1;     // peteleco
+      else if (Math.abs(a.bruto) > a.w * 0.15) dir = a.bruto < 0 ? 1 : -1;                // arrasto de 15% da largura ja vira
+      // so vale se for a folha que o dedo esta segurando
+      if ((dir === 1 && a.alvo !== atual) || (dir === -1 && a.alvo !== atual - 1)) dir = 0;
+    }
+    ir(atual + dir);
+  }
+
+  // dedo
+  function acharToque(lista, id) { for (let i = 0; i < lista.length; i++) if (lista[i].identifier === id) return lista[i]; return null; }
+  mesa.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { if (arr) fim(0, 0, true); return; }
+    const t = e.touches[0];
+    inicio(t.clientX, t.clientY, e.target, 't' + t.identifier);
+  }, { passive: true });
+  mesa.addEventListener('touchmove', function (e) {
+    if (!arr) return;
+    const t = acharToque(e.touches, +String(arr.id).slice(1));
+    if (!t || String(arr.id).charAt(0) !== 't') return;
+    if (movimento(t.clientX, t.clientY) && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  mesa.addEventListener('touchend', function (e) {
+    if (!arr || String(arr.id).charAt(0) !== 't') return;
+    const t = acharToque(e.changedTouches, +String(arr.id).slice(1));
+    if (t) fim(t.clientX, t.clientY, false);
+  });
+  mesa.addEventListener('touchcancel', function () { if (arr && String(arr.id).charAt(0) === 't') fim(0, 0, true); });
+
+  // mouse e caneta
+  mesa.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'touch') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    inicio(e.clientX, e.clientY, e.target, 'p' + e.pointerId);
+  });
+  mesa.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch' || !arr || arr.id !== 'p' + e.pointerId) return;
+    const antes = arr.eixo;
+    if (movimento(e.clientX, e.clientY) && !antes && celular) { try { mesa.setPointerCapture(e.pointerId); } catch (x) {} }
+  });
+  mesa.addEventListener('pointerup', function (e) { if (e.pointerType !== 'touch' && arr && arr.id === 'p' + e.pointerId) fim(e.clientX, e.clientY, false); });
+  mesa.addEventListener('pointercancel', function (e) { if (e.pointerType !== 'touch' && arr && arr.id === 'p' + e.pointerId) fim(e.clientX, e.clientY, true); });
+  mesa.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+  // tocar ou clicar numa foto abre ela ampliada (menos logo depois de um arrasto)
+  livro.addEventListener('click', function (e) {
+    const alvo = e.target.closest('[data-zoom]');
+    if (!alvo || performance.now() - ultimoArrasto < 400) return;
+    abrirVisor(alvo);
+  });
+
+  let tempoResize = null;
+  addEventListener('resize', function () { clearTimeout(tempoResize); tempoResize = setTimeout(construir, 160); });
+
+  montarMiniaturas();
+  construir();
+  paralaxe();
+
+  // depois de um tempo, carrega o resto das paginas em segundo plano
+  function carregarTudo() { $$('.lado.frente', livro).forEach(carregar); }
+  if ('requestIdleCallback' in window) requestIdleCallback(carregarTudo, { timeout: 5000 }); else setTimeout(carregarTudo, 3000);
+})();
