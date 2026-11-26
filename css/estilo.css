@@ -758,7 +758,7 @@ html.cel .ativa .ficha-logo { animation-delay: 1.5s; }
 
 /* ---------- celular ---------- */
 html.cel .pg-capa { position: absolute; display: flex; flex-direction: column; }
-html.cel .capa-foto { flex: none; aspect-ratio: 4 / 5; }
+html.cel .capa-foto { flex: none; }
 html.cel .capa-foto img { transform: none; object-position: 60% 20%; }
 html.cel .capa-painel { --u: calc(var(--pw) / 34); flex: none; padding: 26px 20px 30px; }
 html.cel .capa-rotulo { font-size: 11px; letter-spacing: 0.26em; }
@@ -798,4 +798,9 @@ html.cel .perso-zap {
 html.cel .perso-zap svg { width: 20px; height: 20px; }
 html.cel .ficha-zap { background: var(--cobre); }
 html.cel .ficha-zap:active { background: #8d5f3a; }
+/* no celular a moldura segue a proporcao real das fotos dos uniformes (mais altas que as do masculino): sem isso o corte comia a cabeca */
+html.cel .peca-modelo { aspect-ratio: 1006 / 1536; }
+html.cel .peca-detalhes figure { aspect-ratio: 408 / 764; }
+html.cel .capa-foto { aspect-ratio: 822 / 1536; }
+html.cel .peca-modelo img, html.cel .peca-detalhes img, html.cel .capa-foto img { object-position: 50% 0%; }
 @media (prefers-reduced-motion: reduce) { .capa-foto img { transform: none; } }
