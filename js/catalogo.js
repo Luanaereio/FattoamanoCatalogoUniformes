@@ -47,12 +47,10 @@
   const paginas = [];
   function pagina(o) { o.indice = paginas.length; paginas.push(o); return o; }
 
-  // 1. capa: foto do conjunto off-white e painel creme
+  // 1. capa: so os textos e o indice com links para as pecas (sem foto, pedido dela)
   pagina({
     classe: 'pg-capa', rotulo: 'Capa',
     html: () =>
-      '<figure class="capa-foto"' + zoom('fotos/zoom/' + CAPA.foto + '.webp', foto('grande', CAPA.foto), CAPA.alt) + '>' +
-        img(CAPA.foto, CAPA.alt, [656, 919], '(max-width: 899px) 100vw, 46vw') + '</figure>' +
       '<div class="capa-painel">' +
         '<p class="capa-rotulo">' + esc(CAPA.rotulo) + '</p>' +
         '<img class="capa-logo" src="fotos/marca/lockup-escuro.png" alt="' + esc(LOJA.nome + ', ' + LOJA.assinatura) + '">' +

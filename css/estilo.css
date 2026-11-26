@@ -804,3 +804,17 @@ html.cel .peca-detalhes figure { aspect-ratio: 408 / 764; }
 html.cel .capa-foto { aspect-ratio: 822 / 1536; }
 html.cel .peca-modelo img, html.cel .peca-detalhes img, html.cel .capa-foto img { object-position: 50% 0%; }
 @media (prefers-reduced-motion: reduce) { .capa-foto img { transform: none; } }
+
+/* capa so com textos e o indice (sem foto): o painel ocupa a pagina inteira */
+.pg-capa { grid-template-columns: 1fr; }
+.capa-painel { justify-content: center; padding: calc(var(--u) * 4) calc(var(--u) * 10) calc(var(--u) * 3); }
+.capa-logo { width: calc(var(--u) * 26); margin-top: calc(var(--u) * 2.6); }
+.capa-titulo { font-size: calc(var(--u) * 6.8); }
+.capa-texto { max-width: calc(var(--u) * 46); font-size: calc(var(--u) * 1.4); }
+.capa-indice { grid-template-columns: 1fr 1fr 1fr; max-width: calc(var(--u) * 76); gap: calc(var(--u) * 0.2) calc(var(--u) * 2.6); }
+.capa-indice button { font-size: calc(var(--u) * 0.86); padding: calc(var(--u) * 0.9) 0; }
+.capa-rodape { margin-top: calc(var(--u) * 3.4); }
+html.cel .capa-painel { flex: 1 0 auto; min-height: 100%; justify-content: center; padding: 34px 20px 30px; }
+html.cel .capa-titulo { font-size: calc(var(--pw) * 0.13); }
+html.cel .capa-indice { grid-template-columns: 1fr; max-width: none; }
+html.cel .capa-rodape { margin-top: 24px; }
